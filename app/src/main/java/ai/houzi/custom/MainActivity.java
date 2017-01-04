@@ -12,74 +12,69 @@ import ai.houzi.custom.widget.calender.CalendarList;
 import ai.houzi.custom.widget.calender.CalendarUtils;
 
 import static ai.houzi.custom.R.id.calendarList;
+import static ai.houzi.custom.R.id.end_date;
+import static ai.houzi.custom.R.id.start_date;
 
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
+    private static final int START_YEAR = 2014;//日历开始年
+    TextView start_date;
+    TextView end_date;
+    private CalendarList calendarList;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-//         搜索
-//        final SearchView searchView = (SearchView) findViewById(R.id.searchView);
-//        searchView.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//                searchView.startSearch();
-//                searchView.postDelayed(new Runnable() {
-//                    @Override
-//                    public void run() {
-//                        searchView.stopSearch();
-//                    }
-//                }, 6000);
-//            }
-//        });
-//
-//        final RoundedImageView view = (RoundedImageView) findViewById(R.id.imageView);
-//        view.getDrawable();
-//        view.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//                if (view.isFront()) {
-//                    view.switchBack();
-//                } else {
-//                    view.switchFront();
-//                }
-//            }
-//        });
+        start_date = (TextView) findViewById(R.id.start_date);
+        end_date = (TextView) findViewById(R.id.end_date);
+        calendarList = (CalendarList) findViewById(R.id.calendarList);
 
-        final TextView start_date = (TextView) findViewById(R.id.start_date);
-        final TextView end_date = (TextView) findViewById(R.id.end_date);
-        CalendarList calendarList = (CalendarList) findViewById(R.id.calendarList);
+        initCalendar();
+    }
 
+
+    private void initCalendar() {
         ArrayList<CalendarList.Cale> cales = new ArrayList<>();
-        for (int i = 0; i < 1; i++) {
+        Calendar calendar = Calendar.getInstance();
+        int year = calendar.get(Calendar.YEAR);
+        int month = calendar.get(Calendar.MONTH);
+        //当前之前年
+        for (int i = START_YEAR; i < year; i++) {
             for (int j = 0; j < 12; j++) {
-                cales.add(new CalendarList.Cale(2015 + i, j));
+                cales.add(new CalendarList.Cale(i, j));
             }
+        }
+        //到当前年当前月
+        for (int j = 0; j < month + 1; j++) {
+            cales.add(new CalendarList.Cale(year, j));
         }
         calendarList.setDatas(cales, true);
         calendarList.setOnCalendarClickListener(new CalendarList.OnCalendarClickListener() {
             @Override
             public void onCalendarClick(Calendar start, Calendar end) {
-                if (start != null) {
-                    int month = start.get(Calendar.MONTH);
-                    int day = start.get(Calendar.DATE);
-                    int week = start.get(Calendar.DAY_OF_WEEK);
-                    start_date.setText((month + 1) + "月" + day + "日\n星期" + CalendarUtils.getWeekChinese(week));
-                } else {
-                    start_date.setText("");
-                }
-                if (end != null) {
-                    int month = end.get(Calendar.MONTH);
-                    int day = end.get(Calendar.DATE);
-                    int week = end.get(Calendar.DAY_OF_WEEK);
-                    end_date.setText((month + 1) + "月" + day + "日\n星期" + CalendarUtils.getWeekChinese(week));
-                } else {
-                    end_date.setText("");
-                }
+                setDateWeekText(start, end);
             }
         });
+    }
+
+    private void setDateWeekText(Calendar start, Calendar end) {
+        if (start != null) {
+            int month = start.get(Calendar.MONTH);
+            int day = start.get(Calendar.DATE);
+            int week = start.get(Calendar.DAY_OF_WEEK);
+            start_date.setText((month + 1) + "月" + day + "日\n星期" + CalendarUtils.getWeekChinese(week));
+        } else {
+            start_date.setText("");
+        }
+        if (end != null) {
+            int month = end.get(Calendar.MONTH);
+            int day = end.get(Calendar.DATE);
+            int week = end.get(Calendar.DAY_OF_WEEK);
+            end_date.setText((month + 1) + "月" + day + "日\n星期" + CalendarUtils.getWeekChinese(week));
+        } else {
+            end_date.setText("");
+        }
     }
 }

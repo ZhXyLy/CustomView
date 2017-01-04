@@ -7,22 +7,23 @@ import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.RectF;
-import android.graphics.Xfermode;
 import android.text.TextPaint;
 import android.util.AttributeSet;
-import android.util.Log;
-import android.util.SparseArray;
-import android.util.SparseIntArray;
 import android.view.MotionEvent;
 import android.view.View;
-import android.widget.Toast;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.List;
+
+import ai.houzi.custom.util.Unit;
+
+import static android.R.attr.startY;
 
 public class CalendarView extends View {
     private static final String TAG = "CalendarView";
     private static final int WEEK_SIZE = 7;
+    private int PADDING = 2;
     private int mWidth, mHeight;
     private int mPerWidth;
     private int mCurYear;
@@ -30,10 +31,8 @@ public class CalendarView extends View {
 
     private TextPaint mTextPaint;
     private Paint mPaint;
-    private boolean isPress;
-    private boolean isSelect;
-    private float[] pressPoint = new float[2];
-    private float[] selectDay = new float[2];
+    private float[] pressPoint = new float[2];//通过按下的位置计算day
+    private List<Calendar> selectDate = new ArrayList<>();//存储选中的首末日期Calendar
 
     public CalendarView(Context context) {
         this(context, null);
@@ -45,6 +44,7 @@ public class CalendarView extends View {
 
     public CalendarView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+        PADDING = Unit.dp2px(context, 2);
         mPaint = new Paint();
         mPaint.setAntiAlias(true);
         mPaint.setColor(Color.RED);
@@ -53,7 +53,7 @@ public class CalendarView extends View {
         mTextPaint = new TextPaint();
         mTextPaint.setAntiAlias(true);
         mTextPaint.setColor(Color.BLACK);
-        mTextPaint.setTextSize(getResources().getDisplayMetrics().density * 14 + 0.5f);
+        mTextPaint.setTextSize(Unit.dp2px(context, 14));
 
         Calendar calendar = Calendar.getInstance();
         mCurYear = calendar.get(Calendar.YEAR);
@@ -77,54 +77,147 @@ public class CalendarView extends View {
         mPerWidth = mWidth / WEEK_SIZE;
     }
 
-    SparseArray<RectF> rectFSparseArray = new SparseArray<>();
-
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
+        if (selectDate.size() == 2) {//两头都选中，绘制一个选中范围
+            drawScope(canvas);
+        } else if (selectDate.size() == 1) {//只选中了一个点，绘制一个点
+            drawAPoint(canvas);
+        } else {//正常绘制
+            drawCalendarNormal(canvas);
+        }
+    }
+
+    private void drawCalendarNormal(Canvas canvas) {
         int daySize = CalendarUtils.getMonthDays(mCurYear, mCurMonth);
         int firstDayWeek = CalendarUtils.getFirstDayWeek(mCurYear, mCurMonth);
 
         Paint.FontMetrics fontMetrics = mTextPaint.getFontMetrics();
         float fontHeight = fontMetrics.descent - fontMetrics.ascent;
-
         for (int i = 0; i < daySize; i++) {
             int left = ((firstDayWeek + i) % WEEK_SIZE) * mPerWidth;
             int right = ((firstDayWeek + i) % WEEK_SIZE + 1) * mPerWidth;
             int top = ((i + firstDayWeek) / WEEK_SIZE) * mPerWidth;
             int bottom = ((i + firstDayWeek) / WEEK_SIZE + 1) * mPerWidth;
             RectF rectF = new RectF(left, top, right, bottom);
-            rectFSparseArray.put(i, rectF);
 
+            //默认背景，文字黑色
+            mTextPaint.setColor(Color.BLACK);
             float mt = mTextPaint.measureText((i + 1) + "");
-            if (isPress && !isSelect && rectF.contains(pressPoint[0], pressPoint[1])) {//只是按下没有抬起
-                mPaint.setXfermode(null);
-                mPaint.setAlpha(127);
-                canvas.drawCircle(rectF.centerX(), rectF.centerY(), mPerWidth / 2 - 10, mPaint);
-            } else if (isPress && isSelect) {//按下并抬起，视为点击选中
-                if (selectDay[0] > 0 && selectDay[1] > 0) {
-                    mPaint.setAlpha(255);
-                    if (i == selectDay[0] - 1) {
-                        RectF rectF1 = new RectF(rectF.centerX(), rectF.top, rectF.right, rectF.bottom);
-                        canvas.drawRect(rectF1, mPaint);
-                        mPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER));
-                        canvas.drawCircle(rectF.centerX(), rectF.centerY(), mPerWidth / 2 - 10, mPaint);
-                    } else if (i == selectDay[1] - 1) {
-                        RectF rectF1 = new RectF(rectF.left, rectF.top, rectF.centerX(), rectF.bottom);
-                        canvas.drawRect(rectF1, mPaint);
-                        mPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER));
-                        canvas.drawCircle(rectF.centerX(), rectF.centerY(), mPerWidth / 2 - 10, mPaint);
-                    } else if (i > selectDay[0] - 1 && i < selectDay[1] - 1) {
-                        mPaint.setXfermode(null);
-                        canvas.drawRect(rectF, mPaint);
-                    }
-                }
-            } else {//正常绘制
-                mTextPaint.setColor(Color.BLACK);
-            }
-            mPaint.setXfermode(null);
             canvas.drawText(i + 1 + "", rectF.centerX() - mt / 2, rectF.centerY() + fontHeight / 3, mTextPaint);
         }
+    }
+
+    private void drawAPoint(Canvas canvas) {
+        Calendar start = selectDate.get(0);
+        int startYear = start.get(Calendar.YEAR);
+        int startMonth = start.get(Calendar.MONTH);
+        int startDay = start.get(Calendar.DATE);
+        int daySize = CalendarUtils.getMonthDays(mCurYear, mCurMonth);
+        int firstDayWeek = CalendarUtils.getFirstDayWeek(mCurYear, mCurMonth);
+
+        Paint.FontMetrics fontMetrics = mTextPaint.getFontMetrics();
+        float fontHeight = fontMetrics.descent - fontMetrics.ascent;
+        for (int i = 0; i < daySize; i++) {
+            int left = ((firstDayWeek + i) % WEEK_SIZE) * mPerWidth;
+            int right = ((firstDayWeek + i) % WEEK_SIZE + 1) * mPerWidth;
+            int top = ((i + firstDayWeek) / WEEK_SIZE) * mPerWidth;
+            int bottom = ((i + firstDayWeek) / WEEK_SIZE + 1) * mPerWidth;
+            RectF rectF = new RectF(left, top, right, bottom);
+
+            if (startYear == mCurYear && startMonth == mCurMonth && startDay - 1 == i) {//选中的日子(年月日对应上)
+                //文字白色，背景红色圆形
+                mTextPaint.setColor(Color.WHITE);
+                canvas.drawCircle(rectF.centerX(), rectF.centerY(), mPerWidth / 2 - PADDING, mPaint);
+            } else {//正常日
+                //默认背景，文字黑色
+                mTextPaint.setColor(Color.BLACK);
+            }
+
+            float mt = mTextPaint.measureText((i + 1) + "");
+            canvas.drawText(i + 1 + "", rectF.centerX() - mt / 2, rectF.centerY() + fontHeight / 3, mTextPaint);
+        }
+    }
+
+    private void drawScope(Canvas canvas) {
+        Calendar start = selectDate.get(0);
+        Calendar end = selectDate.get(1);
+        Calendar instance = Calendar.getInstance();
+
+        int daySize = CalendarUtils.getMonthDays(mCurYear, mCurMonth);
+        int firstDayWeek = CalendarUtils.getFirstDayWeek(mCurYear, mCurMonth);
+
+        Paint.FontMetrics fontMetrics = mTextPaint.getFontMetrics();
+        float fontHeight = fontMetrics.descent - fontMetrics.ascent;
+        for (int i = 0; i < daySize; i++) {
+            int left = ((firstDayWeek + i) % WEEK_SIZE) * mPerWidth;
+            int right = ((firstDayWeek + i) % WEEK_SIZE + 1) * mPerWidth;
+            int top = ((i + firstDayWeek) / WEEK_SIZE) * mPerWidth;
+            int bottom = ((i + firstDayWeek) / WEEK_SIZE + 1) * mPerWidth;
+            RectF rectF = new RectF(left, top, right, bottom);
+
+            instance.set(mCurYear, mCurMonth, i + 1);
+            int day = instance.get(Calendar.DAY_OF_YEAR);
+            int year = instance.get(Calendar.YEAR);
+            if (CalendarUtils.equals(start, instance)) {//开头日
+                //文字白色，背景红色左半圆矩形
+                mTextPaint.setColor(Color.WHITE);
+                RectF rectF1 = new RectF(rectF.centerX(), rectF.top + PADDING, rectF.right, rectF.bottom - PADDING);
+                canvas.drawRect(rectF1, mPaint);
+                mPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER));
+                canvas.drawCircle(rectF.centerX(), rectF.centerY(), mPerWidth / 2 - PADDING, mPaint);
+            } else if (CalendarUtils.equals(end, instance)) {//结尾日
+                //文字白色，背景红色右半圆矩形
+                mTextPaint.setColor(Color.WHITE);
+                RectF rectF1 = new RectF(rectF.left, rectF.top + PADDING, rectF.centerX(), rectF.bottom - PADDING);
+                canvas.drawRect(rectF1, mPaint);
+                mPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER));
+                canvas.drawCircle(rectF.centerX(), rectF.centerY(), mPerWidth / 2 - PADDING, mPaint);
+            } else if (CalendarUtils.inBetween(instance, start, end)) {//中间日
+                //文字白色，背景红色矩形
+                mTextPaint.setColor(Color.WHITE);
+                mPaint.setXfermode(null);
+                RectF rectF1 = new RectF(rectF.left, rectF.top + PADDING, rectF.right, rectF.bottom - PADDING);
+                canvas.drawRect(rectF1, mPaint);
+            } else {//正常日
+                //默认背景，文字黑色
+                mTextPaint.setColor(Color.BLACK);
+            }
+
+            float mt = mTextPaint.measureText((i + 1) + "");
+            canvas.drawText(i + 1 + "", rectF.centerX() - mt / 2, rectF.centerY() + fontHeight / 3, mTextPaint);
+        }
+
+//      -------------------------------------月头月尾-----------------------------------------------
+//        //跳月的话，头和尾绘制红色背景
+//        //头
+        instance.set(mCurYear, mCurMonth, 1);
+        int month = instance.get(Calendar.MONTH);
+        int endMonth = end.get(Calendar.MONTH);
+        int startMonth = start.get(Calendar.MONTH);
+        if (CalendarUtils.inBetween(instance, start, end)) {
+            int left = 0;
+            int right = firstDayWeek * mPerWidth;
+            int top = PADDING;
+            int bottom = mPerWidth - PADDING;
+            RectF rectF = new RectF(left, top, right, bottom);
+            canvas.drawRect(rectF, mPaint);
+        }
+//        //尾
+        instance.set(mCurYear, mCurMonth, CalendarUtils.getMonthDays(mCurYear, mCurMonth));
+        int month2 = instance.get(Calendar.MONTH);
+        int week = instance.get(Calendar.WEEK_OF_MONTH);
+        int lastDayWeek = CalendarUtils.getLastDayWeek(mCurYear, mCurMonth);
+        if (CalendarUtils.inBetween(instance, start, end)) {
+            int left = (lastDayWeek + 1) * mPerWidth;
+            int right = mWidth;
+            int top = (week - 1) * mPerWidth + PADDING;
+            int bottom = (week) * mPerWidth - PADDING;
+            RectF rectF = new RectF(left, top, right, bottom);
+            canvas.drawRect(rectF, mPaint);
+        }
+//      -----------------------------------------------------------------------------------
     }
 
     public void setYearMonth(int year, int month) {
@@ -133,32 +226,33 @@ public class CalendarView extends View {
         requestLayout();
     }
 
+    public void setSelectScope(Calendar startDate, Calendar endDate) {
+        selectDate.clear();
+        if (startDate != null) {
+            selectDate.add(0, startDate);
+        }
+        if (endDate != null) {
+            selectDate.add(1, endDate);
+        }
+        requestLayout();
+    }
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
 //        Log.e(TAG, "onTouchEvent: " + event.getAction());
-        isPress = false;
-        isSelect = false;
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
-                isPress = true;
                 pressPoint[0] = event.getX();
                 pressPoint[1] = event.getY();
-
-                invalidate();
                 break;
             case MotionEvent.ACTION_MOVE:
 
                 break;
             case MotionEvent.ACTION_UP:
-                isSelect = true;
-                isPress = true;
                 doClickDown();
                 invalidate();
                 break;
             case MotionEvent.ACTION_CANCEL:
-                isPress = false;
-                isSelect = false;
-                invalidate();
                 break;
         }
         return true;
@@ -167,16 +261,32 @@ public class CalendarView extends View {
     private void doClickDown() {
         performClick();
         int firstDayWeek = CalendarUtils.getFirstDayWeek(mCurYear, mCurMonth);
+        int weeksInMonth = CalendarUtils.getWeeksInMonth(mCurYear, mCurMonth);
+        int lastDayWeek = CalendarUtils.getLastDayWeek(mCurYear, mCurMonth);
         int x = (int) (pressPoint[0] / mPerWidth);
         int y = (int) (pressPoint[1] / mPerWidth);
         int day = x + y * WEEK_SIZE - firstDayWeek + 1;
-        Toast.makeText(getContext(), mCurYear + "年" + (mCurMonth + 1) + "月" + day + "日", Toast.LENGTH_SHORT).show();
+        if ((y > 0 && y < weeksInMonth - 1)
+                || (y == 0 && x > firstDayWeek - 1)
+                || (y == weeksInMonth - 1 && x < lastDayWeek + 1)) {
 
-        if (selectDay[0] != 0 && selectDay[1] == 0) {
-            selectDay[1] = day;
-            Arrays.sort(selectDay);
-        } else {
-            selectDay[0] = day;
+            if (onCalendarClickListener != null) {
+                Calendar calendar = Calendar.getInstance();
+                calendar.set(mCurYear, mCurMonth, day);
+                onCalendarClickListener.onCalendarClick(calendar);
+            }
         }
     }
+
+    interface OnCalendarClickListener {
+        void onCalendarClick(Calendar calendar);
+
+    }
+
+    public void setOnCalendarClickListener(OnCalendarClickListener listener) {
+        this.onCalendarClickListener = listener;
+    }
+
+    private OnCalendarClickListener onCalendarClickListener;
+
 }
