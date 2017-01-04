@@ -45,6 +45,7 @@ public class CalendarList extends ListView {
         calendarAdapter.setOnCalendarClickListener(new CalendarAdapter.OnCalendarClickListener() {
             @Override
             public void onCalendarClick(Calendar start, Calendar end) {
+                //点击选中后，回调传回选中的首尾日历
                 if (onCalendarClickListener != null) {
                     onCalendarClickListener.onCalendarClick(start, end);
                 }

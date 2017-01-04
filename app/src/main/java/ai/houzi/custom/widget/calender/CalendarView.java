@@ -18,16 +18,14 @@ import java.util.List;
 
 import ai.houzi.custom.util.Unit;
 
-import static android.R.attr.startY;
-
 public class CalendarView extends View {
     private static final String TAG = "CalendarView";
-    private static final int WEEK_SIZE = 7;
-    private int PADDING = 2;
-    private int mWidth, mHeight;
-    private int mPerWidth;
-    private int mCurYear;
-    private int mCurMonth;
+    private static final int WEEK_SIZE = 7;//一周七天
+    private int PADDING = 2;//行间距
+    private int mWidth;
+    private int mPerWidth;//每日的宽高
+    private int mCurYear;//当前年
+    private int mCurMonth;//当前月
 
     private TextPaint mTextPaint;
     private Paint mPaint;
@@ -55,6 +53,7 @@ public class CalendarView extends View {
         mTextPaint.setColor(Color.BLACK);
         mTextPaint.setTextSize(Unit.dp2px(context, 14));
 
+        //当前日期
         Calendar calendar = Calendar.getInstance();
         mCurYear = calendar.get(Calendar.YEAR);
         mCurMonth = calendar.get(Calendar.MONTH);
@@ -63,17 +62,18 @@ public class CalendarView extends View {
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int sizeWidth = MeasureSpec.getSize(widthMeasureSpec);
-        int perHeight = sizeWidth / WEEK_SIZE;
+        int perHeight = sizeWidth / WEEK_SIZE;//计算每日的宽高（正方形）
 
+        //按月计算当前有几周，算出总高度
         int sizeHeight = perHeight * CalendarUtils.getWeeksInMonth(mCurYear, mCurMonth);
-        setMeasuredDimension(sizeWidth, sizeHeight);
+        //由于计算时用的int，所以宽度占不满，设置宽度为7份和
+        setMeasuredDimension(perHeight * WEEK_SIZE, sizeHeight);
     }
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         mWidth = w;
-        mHeight = h;
         mPerWidth = mWidth / WEEK_SIZE;
     }
 
@@ -158,8 +158,6 @@ public class CalendarView extends View {
             RectF rectF = new RectF(left, top, right, bottom);
 
             instance.set(mCurYear, mCurMonth, i + 1);
-            int day = instance.get(Calendar.DAY_OF_YEAR);
-            int year = instance.get(Calendar.YEAR);
             if (CalendarUtils.equals(start, instance)) {//开头日
                 //文字白色，背景红色左半圆矩形
                 mTextPaint.setColor(Color.WHITE);
@@ -192,10 +190,7 @@ public class CalendarView extends View {
 //      -------------------------------------月头月尾-----------------------------------------------
 //        //跳月的话，头和尾绘制红色背景
 //        //头
-        instance.set(mCurYear, mCurMonth, 1);
-        int month = instance.get(Calendar.MONTH);
-        int endMonth = end.get(Calendar.MONTH);
-        int startMonth = start.get(Calendar.MONTH);
+        instance.set(mCurYear, mCurMonth, 0);
         if (CalendarUtils.inBetween(instance, start, end)) {
             int left = 0;
             int right = firstDayWeek * mPerWidth;
@@ -206,7 +201,6 @@ public class CalendarView extends View {
         }
 //        //尾
         instance.set(mCurYear, mCurMonth, CalendarUtils.getMonthDays(mCurYear, mCurMonth));
-        int month2 = instance.get(Calendar.MONTH);
         int week = instance.get(Calendar.WEEK_OF_MONTH);
         int lastDayWeek = CalendarUtils.getLastDayWeek(mCurYear, mCurMonth);
         if (CalendarUtils.inBetween(instance, start, end)) {
@@ -239,7 +233,6 @@ public class CalendarView extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-//        Log.e(TAG, "onTouchEvent: " + event.getAction());
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 pressPoint[0] = event.getX();
@@ -259,13 +252,14 @@ public class CalendarView extends View {
     }
 
     private void doClickDown() {
-        performClick();
+//        performClick();
         int firstDayWeek = CalendarUtils.getFirstDayWeek(mCurYear, mCurMonth);
         int weeksInMonth = CalendarUtils.getWeeksInMonth(mCurYear, mCurMonth);
         int lastDayWeek = CalendarUtils.getLastDayWeek(mCurYear, mCurMonth);
         int x = (int) (pressPoint[0] / mPerWidth);
         int y = (int) (pressPoint[1] / mPerWidth);
         int day = x + y * WEEK_SIZE - firstDayWeek + 1;
+        //算点击的三种情况：1.在中间行，2.第一行，在第一日之后，3.最后一周的，小于最后一日
         if ((y > 0 && y < weeksInMonth - 1)
                 || (y == 0 && x > firstDayWeek - 1)
                 || (y == weeksInMonth - 1 && x < lastDayWeek + 1)) {
@@ -278,6 +272,7 @@ public class CalendarView extends View {
         }
     }
 
+    //日历点击后回调，在列表中处理
     interface OnCalendarClickListener {
         void onCalendarClick(Calendar calendar);
 
