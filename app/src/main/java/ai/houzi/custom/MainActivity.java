@@ -3,6 +3,7 @@ package ai.houzi.custom;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.View;
 import android.widget.TextView;
 
 import java.util.ArrayList;
@@ -10,6 +11,7 @@ import java.util.Calendar;
 
 import ai.houzi.custom.widget.calender.CalendarList;
 import ai.houzi.custom.widget.calender.CalendarUtils;
+import tyrantgit.explosionfield.ExplosionField;
 
 import static ai.houzi.custom.R.id.calendarList;
 import static ai.houzi.custom.R.id.end_date;
@@ -22,6 +24,7 @@ public class MainActivity extends AppCompatActivity {
     TextView start_date;
     TextView end_date;
     private CalendarList calendarList;
+    private ExplosionField explosionField;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,6 +35,13 @@ public class MainActivity extends AppCompatActivity {
         calendarList = (CalendarList) findViewById(R.id.calendarList);
 
         initCalendar();
+        explosionField = ExplosionField.attach2Window(this);
+        start_date.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                explosionField.explode(start_date);
+            }
+        });
     }
 
 
@@ -40,6 +50,7 @@ public class MainActivity extends AppCompatActivity {
         Calendar calendar = Calendar.getInstance();
         int year = calendar.get(Calendar.YEAR);
         int month = calendar.get(Calendar.MONTH);
+
         //当前之前年
         for (int i = START_YEAR; i < year; i++) {
             for (int j = 0; j < 12; j++) {

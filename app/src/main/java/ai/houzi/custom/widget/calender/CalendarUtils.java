@@ -31,6 +31,20 @@ public class CalendarUtils {
     }
 
     /**
+     * 比较大小
+     * @param cal1
+     * @param cal2
+     * @return 0：相等，即同一天，-1：cal1比cal2小，1：cal1比cal2大
+     */
+    public static int compareTo(Calendar cal1, Calendar cal2) {
+        if (equals(cal1, cal2)) {
+            return 0;
+        } else {
+            return cal1.compareTo(cal2);
+        }
+    }
+
+    /**
      * 返回周对应的中文
      *
      * @param week

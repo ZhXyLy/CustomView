@@ -152,7 +152,7 @@ public class CalendarList extends ListView {
                         Calendar old = list.get(0);
                         //比较old小于calendar，返回小于0，反之。
                         //返回0，相等
-                        int compareTo = old.compareTo(calendar);
+                        int compareTo = CalendarUtils.compareTo(old, calendar);
 
                         if (compareTo < 0) {
                             list.add(1, calendar);
