@@ -2,20 +2,15 @@ package ai.houzi.custom;
 
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
 
-import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.List;
 
 import ai.houzi.custom.widget.calender.CalendarList;
 import ai.houzi.custom.widget.calender.CalendarUtils;
 import tyrantgit.explosionfield.ExplosionField;
-
-import static ai.houzi.custom.R.id.calendarList;
-import static ai.houzi.custom.R.id.end_date;
-import static ai.houzi.custom.R.id.start_date;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -46,26 +41,24 @@ public class MainActivity extends AppCompatActivity {
 
 
     private void initCalendar() {
-        ArrayList<CalendarList.Cale> cales = new ArrayList<>();
-        Calendar calendar = Calendar.getInstance();
-        int year = calendar.get(Calendar.YEAR);
-        int month = calendar.get(Calendar.MONTH);
-
-        //当前之前年
-        for (int i = START_YEAR; i < year; i++) {
-            for (int j = 0; j < 12; j++) {
-                cales.add(new CalendarList.Cale(i, j));
-            }
-        }
-        //到当前年当前月
-        for (int j = 0; j < month + 1; j++) {
-            cales.add(new CalendarList.Cale(year, j));
-        }
-        calendarList.setDatas(cales, true);
+        calendarList.setSelectMode(CalendarList.RANGE);
         calendarList.setOnCalendarClickListener(new CalendarList.OnCalendarClickListener() {
             @Override
-            public void onCalendarClick(Calendar start, Calendar end) {
+            public void onSingleCalendar(Calendar calendar) {
+            // TODO: 2017/1/16 单选回调，其他时候不调
+            setDateWeekText(calendar, null);
+        }
+
+            @Override
+            public void onRangeCalendar(Calendar start, Calendar end) {
+                // TODO: 2017/1/16 范围选择回调，其他时候不调
                 setDateWeekText(start, end);
+            }
+
+            @Override
+            public void onMultipleCalendar(Calendar calendar, List<Calendar> list) {
+                // TODO: 2017/1/16 多选回调，其他时候不调 ，{list中包含calendar对象}
+                setDateWeekText(calendar, null);
             }
         });
     }

@@ -1,21 +1,47 @@
 package ai.houzi.custom.widget.calender;
 
 import android.content.Context;
+import android.support.annotation.IntDef;
 import android.util.AttributeSet;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.BaseAdapter;
+import android.util.Log;
+import android.widget.AbsListView;
 import android.widget.ListView;
-import android.widget.TextView;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 
-import ai.houzi.custom.R;
+import static android.content.ContentValues.TAG;
 
 public class CalendarList extends ListView {
+
+    private int pageSize = 12;//每次增加的月份
+
+    private int mSelectMode = 1;//默认单选
+    private int mCurrentYear;
+
+    @IntDef({SINGLE, RANGE, MULTIPLE})
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface SelectMode {
+    }
+
+    public static final int SINGLE = 1;//单选
+    public static final int RANGE = 2;//范围
+    public static final int MULTIPLE = 3;//多选
+
+    /**
+     * 设置选择模式
+     *
+     * @param selectMode One of {@link #SINGLE}, {@link #RANGE}, or {@link #MULTIPLE}.
+     *                   {@link SelectMode}
+     */
+    public void setSelectMode(int selectMode) {
+        this.mSelectMode = selectMode;
+        calendarAdapter.setSelectMode(selectMode);
+    }
+
     private List<Cale> datas;//传入的年月集合
     private CalendarAdapter calendarAdapter;//所有月份日历adapter
 
@@ -40,183 +66,172 @@ public class CalendarList extends ListView {
             setAdapter(calendarAdapter);
             return;
         }
-
-        calendarAdapter = new CalendarAdapter(datas);
-        calendarAdapter.setOnCalendarClickListener(new CalendarAdapter.OnCalendarClickListener() {
+        setOnScrollListener(new OnScrollListener() {
             @Override
-            public void onCalendarClick(Calendar start, Calendar end) {
-                //点击选中后，回调传回选中的首尾日历
-                if (onCalendarClickListener != null) {
-                    onCalendarClickListener.onCalendarClick(start, end);
+            public void onScrollStateChanged(AbsListView view, int scrollState) {
+
+            }
+
+            @Override
+            public void onScroll(AbsListView view, int firstVisibleItem, int visibleItemCount, int totalItemCount) {
+                Log.e(TAG, "onScroll: " + "=firstVisibleItem==" + firstVisibleItem + "=visibleItemCount=" + visibleItemCount + "=totalItemCount==" + totalItemCount);
+                if (isCanAddNextYear && totalItemCount > 3 && firstVisibleItem + visibleItemCount == totalItemCount) {
+                    isCanAddNextYear = false;
+                    addNextYear();
+                } else if (isCanAddLastYear && totalItemCount > 3 && firstVisibleItem == 0) {
+                    isCanAddLastYear = false;
+                    addLastYear();
                 }
             }
         });
+
+        Calendar calendar = Calendar.getInstance();
+        mCurrentYear = calendar.get(Calendar.YEAR);
+        int month = calendar.get(Calendar.MONTH);
+        mMaxYear = mCurrentYear + 50;//限制一下，最大不超过50年后
+
+        setDatas(mCurrentYear, month);
     }
 
     /**
-     * 填充数据
-     *
-     * @param datas    填充的数据
-     * @param isBottom 是否滚动到最底部
+     * 第一次填充数据，初始化
      */
-    public void setDatas(List<Cale> datas, boolean isBottom) {
-        if (datas == null || datas.isEmpty()) {
-            return;
+    private void setDatas(int year, int month) {
+        //添加一年
+        for (int i = 0; i < pageSize; i++) {
+            datas.add(new Cale(year, i));
         }
-        this.datas.clear();
-        this.datas.addAll(datas);
+        calendarAdapter = new CalendarAdapter(datas);
         setAdapter(calendarAdapter);
-        if (isBottom) {
-            setSelection(calendarAdapter.getCount() - 1);
-        }
+        setSelection(month);
     }
 
+    private int next = 1;
+    private int last = 1;
+    private boolean isCanAddNextYear = true;
+    private boolean isCanAddLastYear = true;
+
+    /**
+     * 添加下一年
+     */
+    private void addNextYear() {
+        int year = mCurrentYear + next;
+        if (mMaxYear > mCurrentYear && year > mMaxYear) {
+            return;
+        }
+        next++;
+        //添加一年
+        for (int i = 0; i < pageSize; i++) {
+            datas.add(new Cale(year, i));
+        }
+        calendarAdapter.notifyDataSetChanged();
+        isCanAddNextYear = true;
+    }
+
+    /**
+     * 添加上一年
+     */
+    private void addLastYear() {
+        int year = mCurrentYear - last;
+        if (year < mMinYear) {
+            return;
+        }
+        last++;
+        //添加一年
+        for (int i = 0; i < pageSize; i++) {
+            datas.add(i, new Cale(year, i));
+        }
+        calendarAdapter.notifyDataSetChanged();
+        setSelection(12);
+        isCanAddLastYear = true;
+    }
+
+    /**
+     * @return 返回选中的日子集合（范围选择是首和尾，双闭区间[start,end]）
+     */
     public List<Calendar> getDates() {
         return calendarAdapter.getDate();
     }
 
+    /**
+     * 清空选择的日子
+     */
     public void clear() {
         calendarAdapter.clear();
-    }
-
-    public void updateDates(List<Calendar> calendars) {
-        calendarAdapter.updateDates(calendars);
     }
 
     public static class Cale {
         int year;
         int month;
 
-        public Cale(int year, int month) {
+        Cale(int year, int month) {
             this.year = year;
             this.month = month;
         }
     }
 
-    private static class CalendarAdapter extends BaseAdapter {
-        private List<Cale> datas;
-        private List<Calendar> list = new ArrayList<>();
+    private int mMinYear = 1970;
 
-        CalendarAdapter(List<Cale> datas) {
-            this.datas = datas;
-        }
+    /**
+     * 设置最小年(不能小于1970年)
+     */
+    public void setMinYear(int minYear) {
+        mMinYear = Math.max(minYear, mMinYear);
+    }
 
-        @Override
-        public int getCount() {
-            return datas.size();
-        }
+    private int mMaxYear;
 
-        @Override
-        public Object getItem(int position) {
-            return datas.get(position);
-        }
-
-        @Override
-        public long getItemId(int position) {
-            return position;
-        }
-
-        @Override
-        public View getView(final int position, View convertView, ViewGroup parent) {
-            final ViewHolder holder;
-            if (convertView == null) {
-                convertView = LayoutInflater.from(parent.getContext()).inflate(R.layout.calendar_item, parent, false);
-                holder = new ViewHolder();
-                holder.tvYearMonth = (TextView) convertView.findViewById(R.id.tv_year_month);
-                holder.calendarView = (CalendarView) convertView.findViewById(R.id.calendarView);
-                convertView.setTag(holder);
-            } else {
-                holder = (ViewHolder) convertView.getTag();
-            }
-            Cale cale = (Cale) getItem(position);
-            //title
-            holder.tvYearMonth.setText(cale.year + "年" + (cale.month + 1) + "月");
-            //设置当前日历的年月
-            holder.calendarView.setYearMonth(cale.year, cale.month);
-            //点击选中后的点（Calendar）集合（最多两个），通知CalendarView重绘
-            if (list.size() == 2) {
-                holder.calendarView.setSelectScope(list.get(0), list.get(1));
-            } else if (list.size() == 1) {
-                holder.calendarView.setSelectScope(list.get(0), null);
-            } else {
-                holder.calendarView.setSelectScope(null, null);
-            }
-            //所有的点击处理
-            holder.calendarView.setOnCalendarClickListener(new CalendarView.OnCalendarClickListener() {
-                @Override
-                public void onCalendarClick(Calendar calendar) {
-                    if (list.size() == 2) {//存了两个值说明是点第三下，要清空前边两个点，重置为第一个点
-                        list.clear();
-                        list.add(0, calendar);
-                    } else if (list.size() == 1) {//存了一个点说明是点第二下，排序存入此范围
-                        Calendar old = list.get(0);
-                        //比较old小于calendar，返回小于0，反之。
-                        //返回0，相等
-                        int compareTo = CalendarUtils.compareTo(old, calendar);
-
-                        if (compareTo < 0) {
-                            list.add(1, calendar);
-                        } else if (compareTo > 0) {
-                            list.clear();
-                            list.add(0, calendar);
-                            list.add(1, old);
-                        }//相等时说明点的是同一个点，不变
-                    } else {//未存入点，存入此点作为第一个点
-                        list.clear();
-                        list.add(0, calendar);
-                    }
-
-                    notifyDataSetChanged();//重置后刷新一下页面
-                    if (onCalendarClickListener != null) {//点击后list里至少有一个点，第二个可能有可能没有
-                        onCalendarClickListener.onCalendarClick(list.get(0), list.size() == 2 ? list.get(1) : null);
-                    }
-                }
-            });
-            return convertView;
-        }
-
-        public void clear() {
-            list.clear();
-            notifyDataSetChanged();
-        }
-
-        public List<Calendar> getDate() {
-            ArrayList<Calendar> calendars = new ArrayList<>();
-            calendars.addAll(list);
-            return calendars;
-        }
-
-        public void updateDates(List<Calendar> calendars) {
-            if (calendars == null) {
-                return;
-            }
-            list.clear();
-            list.addAll(calendars);
-            notifyDataSetChanged();
-        }
-
-        class ViewHolder {
-            TextView tvYearMonth;
-            CalendarView calendarView;
-        }
-
-        interface OnCalendarClickListener {
-            void onCalendarClick(Calendar start, Calendar end);
-        }
-
-        void setOnCalendarClickListener(OnCalendarClickListener listener) {
-            this.onCalendarClickListener = listener;
-        }
-
-        private OnCalendarClickListener onCalendarClickListener;
+    /**
+     * 设置最大年
+     */
+    public void setMaxYear(int maxYear) {
+        mMaxYear = Math.min(maxYear, mMaxYear);
     }
 
     public interface OnCalendarClickListener {
-        void onCalendarClick(Calendar start, Calendar end);
+        /**
+         * 单选
+         */
+        void onSingleCalendar(Calendar calendar);
+
+        /**
+         * 范围选择
+         */
+        void onRangeCalendar(Calendar start, Calendar end);
+
+        /**
+         * 多选
+         *
+         * @param calendar 当前点击的日子
+         * @param list     所有选中的日子
+         */
+        void onMultipleCalendar(Calendar calendar, List<Calendar> list);
     }
 
     public void setOnCalendarClickListener(OnCalendarClickListener listener) {
         this.onCalendarClickListener = listener;
+        calendarAdapter.setOnCalendarClickListener(new CalendarAdapter.OnCalendarClickListener() {
+            @Override
+            public void onSingleCalendar(Calendar calendar) {
+                if (mSelectMode == SINGLE && onCalendarClickListener != null) {
+                    onCalendarClickListener.onSingleCalendar(calendar);
+                }
+            }
+
+            @Override
+            public void onRangeCalendar(Calendar start, Calendar end) {
+                if (mSelectMode == RANGE && onCalendarClickListener != null) {
+                    onCalendarClickListener.onRangeCalendar(start, end);
+                }
+            }
+
+            @Override
+            public void onMultipleCalendar(Calendar calendar, List<Calendar> list) {
+                if (mSelectMode == MULTIPLE && onCalendarClickListener != null) {
+                    onCalendarClickListener.onMultipleCalendar(calendar, list);
+                }
+            }
+        });
     }
 
     private OnCalendarClickListener onCalendarClickListener;

@@ -16,21 +16,35 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 
-import ai.houzi.custom.util.Unit;
-
+/**
+ *
+ */
 public class CalendarView extends View {
     private static final String TAG = "CalendarView";
-    private static final int WEEK_SIZE = 7;//一周七天
-    private int PADDING = 2;//行间距
+    private int mSelectMode = 1;//默认单选
+
+    interface SelectMode {
+        int Single = 1;//单选
+        int Range = 2;//范围
+        int Multiple = 3;//多选
+    }
+
+    public void setSelectMode(int selectMode) {
+        this.mSelectMode = selectMode;
+    }
+
+    private static final int WEEK_SIZE = 7;
+    private int PADDING = 2;
     private int mWidth;
-    private int mPerWidth;//每日的宽高
-    private int mCurYear;//当前年
-    private int mCurMonth;//当前月
+    private int mPerWidth;
+    private int mCurYear;
+    private int mCurMonth;
 
     private TextPaint mTextPaint;
     private Paint mPaint;
     private float[] pressPoint = new float[2];//通过按下的位置计算day
     private List<Calendar> selectDate = new ArrayList<>();//存储选中的首末日期Calendar
+
 
     public CalendarView(Context context) {
         this(context, null);
@@ -42,7 +56,7 @@ public class CalendarView extends View {
 
     public CalendarView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-        PADDING = Unit.dp2px(context, 2);
+        PADDING = UnitUtils.dp2px(context, 2);
         mPaint = new Paint();
         mPaint.setAntiAlias(true);
         mPaint.setColor(Color.RED);
@@ -51,9 +65,8 @@ public class CalendarView extends View {
         mTextPaint = new TextPaint();
         mTextPaint.setAntiAlias(true);
         mTextPaint.setColor(Color.BLACK);
-        mTextPaint.setTextSize(Unit.dp2px(context, 14));
+        mTextPaint.setTextSize(UnitUtils.dp2px(context, 14));
 
-        //当前日期
         Calendar calendar = Calendar.getInstance();
         mCurYear = calendar.get(Calendar.YEAR);
         mCurMonth = calendar.get(Calendar.MONTH);
@@ -62,9 +75,8 @@ public class CalendarView extends View {
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int sizeWidth = MeasureSpec.getSize(widthMeasureSpec);
-        int perHeight = sizeWidth / WEEK_SIZE;//计算每日的宽高（正方形）
+        int perHeight = sizeWidth / WEEK_SIZE;
 
-        //按月计算当前有几周，算出总高度
         int sizeHeight = perHeight * CalendarUtils.getWeeksInMonth(mCurYear, mCurMonth);
         //由于计算时用的int，所以宽度占不满，设置宽度为7份和
         setMeasuredDimension(perHeight * WEEK_SIZE, sizeHeight);
@@ -80,9 +92,9 @@ public class CalendarView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        if (selectDate.size() == 2) {//两头都选中，绘制一个选中范围
+        if (mSelectMode == SelectMode.Range && selectDate.size() == 2) {//范围选择
             drawScope(canvas);
-        } else if (selectDate.size() == 1) {//只选中了一个点，绘制一个点
+        } else if (selectDate.size() > 0) {//选中一个点或者多个点
             drawAPoint(canvas);
         } else {//正常绘制
             drawCalendarNormal(canvas);
@@ -110,10 +122,6 @@ public class CalendarView extends View {
     }
 
     private void drawAPoint(Canvas canvas) {
-        Calendar start = selectDate.get(0);
-        int startYear = start.get(Calendar.YEAR);
-        int startMonth = start.get(Calendar.MONTH);
-        int startDay = start.get(Calendar.DATE);
         int daySize = CalendarUtils.getMonthDays(mCurYear, mCurMonth);
         int firstDayWeek = CalendarUtils.getFirstDayWeek(mCurYear, mCurMonth);
 
@@ -125,8 +133,15 @@ public class CalendarView extends View {
             int top = ((i + firstDayWeek) / WEEK_SIZE) * mPerWidth;
             int bottom = ((i + firstDayWeek) / WEEK_SIZE + 1) * mPerWidth;
             RectF rectF = new RectF(left, top, right, bottom);
-
-            if (startYear == mCurYear && startMonth == mCurMonth && startDay - 1 == i) {//选中的日子(年月日对应上)
+            boolean isSelect = false;
+            Calendar instance = Calendar.getInstance();
+            instance.set(mCurYear, mCurMonth, i + 1);
+            for (Calendar calendar : selectDate) {
+                if (CalendarUtils.equals(calendar, instance)) {
+                    isSelect = true;
+                }
+            }
+            if (isSelect) {//选中的日子(年月日对应上)
                 //文字白色，背景红色圆形
                 mTextPaint.setColor(Color.WHITE);
                 canvas.drawCircle(rectF.centerX(), rectF.centerY(), mPerWidth / 2 - PADDING, mPaint);
@@ -220,14 +235,10 @@ public class CalendarView extends View {
         requestLayout();
     }
 
-    public void setSelectScope(Calendar startDate, Calendar endDate) {
+    public void setSelectList(List<Calendar> list, int selectMode) {
+        this.mSelectMode = selectMode;
         selectDate.clear();
-        if (startDate != null) {
-            selectDate.add(0, startDate);
-        }
-        if (endDate != null) {
-            selectDate.add(1, endDate);
-        }
+        selectDate.addAll(list);
         requestLayout();
     }
 
@@ -259,7 +270,6 @@ public class CalendarView extends View {
         int x = (int) (pressPoint[0] / mPerWidth);
         int y = (int) (pressPoint[1] / mPerWidth);
         int day = x + y * WEEK_SIZE - firstDayWeek + 1;
-        //算点击的三种情况：1.在中间行，2.第一行，在第一日之后，3.最后一周的，小于最后一日
         if ((y > 0 && y < weeksInMonth - 1)
                 || (y == 0 && x > firstDayWeek - 1)
                 || (y == weeksInMonth - 1 && x < lastDayWeek + 1)) {
@@ -272,8 +282,7 @@ public class CalendarView extends View {
         }
     }
 
-    //日历点击后回调，在列表中处理
-    interface OnCalendarClickListener {
+    public interface OnCalendarClickListener {
         void onCalendarClick(Calendar calendar);
 
     }
